@@ -115,8 +115,8 @@ function extractEventData() {
     let screen_info = query_params.scr ? query_params.scr : '';
     let cookies_enabled = query_params.nck ? query_params.nck : '';
     let java_enabled = query_params.njv ? query_params.njv : '';
-    let gdpr_enabled = query_params.gdpr ? query_params.sid : '';
-    let gdpr_consent = query_params.gdpr_consent ? query_params.sid : '';
+    let gdpr_enabled = query_params.gdpr ? query_params.gdpr_enabled : '';
+    let gdpr_consent = query_params.gdpr_consent ? query_params.gdpr_consent : '';
     let click_ids = getCookieValues('_iclid')[0] ? getCookieValues('_iclid')[0] : '';
 
     let tracking_category = query_params.trc ? query_params.trc : '';
@@ -307,6 +307,6 @@ scenarios: []
 
 ___NOTES___
 
-Created on 18.2.2022, 14:38:03
+Created on 11.5.2022, 08:54:48
 
 
