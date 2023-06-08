@@ -1,11 +1,3 @@
-___TERMS_OF_SERVICE___
-
-By creating or modifying this file you agree to Google Tag Manager's Community
-Template Gallery Developer Terms of Service available at
-https://developers.google.com/tag-manager/gallery-tos (or such other URL as
-Google may provide), as modified from time to time.
-
-
 ___INFO___
 
 {
@@ -13,7 +5,7 @@ ___INFO___
   "id": "cvt_temp_public_id",
   "version": 1,
   "securityGroups": [],
-  "displayName": "Ingenious Technologies Tracking Client",
+  "displayName": "i19s Server Client",
   "brand": {
     "id": "brand_dummy",
     "displayName": "",
@@ -33,156 +25,324 @@ ___TEMPLATE_PARAMETERS___
 
 ___SANDBOXED_JS_FOR_SERVER___
 
-const claimRequest = require('claimRequest');
-const getRequestPath = require('getRequestPath');
-const returnResponse = require('returnResponse');
-const runContainer = require('runContainer');
-const getRequestQueryParameters = require('getRequestQueryParameters');
-const getCookieValues = require('getCookieValues');
-const logToConsole = require('logToConsole');
+(function () {
+    'use strict';
 
-function checkUrl(urlPath) {
-  let checkPattern = (url, state) => {
-    switch (state) {
-      case 'q0':
-        if (url.substring(0, 5) === '/ts/i') {
-          return checkPattern(url.substring(5), 'q1');
-        }
-        break;
-      case 'q1':
-        if (
-          ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'].indexOf(
-            url.charAt(0)
-          ) != -1
-        ) {
-          return checkPattern(url.substring(1), 'q1');
-        }
-        if (url.substring(0, 3) === '/ts') {
-          return checkPattern(url.substring(3), 'q2');
-        }
-        break;
-      case 'q2':
-        if (['a', 'v', 'c'].indexOf(url.charAt(0)) != -1) {
-          return true;
-        }
-        break;
+    var TrackingUrlType;
+    (function (TrackingUrlType) {
+        TrackingUrlType["click"] = "click";
+        TrackingUrlType["conversion"] = "conversion";
+        TrackingUrlType["view"] = "view";
+        TrackingUrlType["unknown"] = "unknown";
+    })(TrackingUrlType || (TrackingUrlType = {}));
+
+    function checkForTs(input) {
+        return input === "ts";
     }
-    return false;
-  };
-  return checkPattern(urlPath, 'q0');
-}
-
-function extractEventName(path) {
-    let eventType = path.slice(-1);
-    switch (eventType) {
-        case 'a': return 'ing_conversion';
-        case 'c': return 'ing_click';
-        case 'v': return 'ing_adimpression';
+    function checkForAdvertiserId(input) {
+        if (!input || input.length === 0) {
+            return false;
+        }
+        for (var i = 0; i < input.length; i++) {
+            var char = input[i];
+            if (i === 0) {
+                if (char !== "i" && !(char >= "0" && char <= "9")) {
+                    return false;
+                }
+            }
+            else if (!(char >= "0" && char <= "9")) {
+                return false;
+            }
+        }
+        return true;
     }
-}
-
-function extractAdvertiserId(request_path) {
-    let advertiser_id = '';
-    for (let i in request_path) {
-        if (['i','1','2','3','4','5','6','7','8','9','0'].indexOf(request_path.charAt(i)) != -1) {
-            advertiser_id += request_path.charAt(i);
+    function checkForTrackingMethod(input) {
+        return input.charAt(0) === 't' && input.charAt(1) === 's' && (input.charAt(2) === 'a' || input.charAt(2) === 'v' || input.charAt(2) === 'c');
+    }
+    function checkFori19sTrackingPath(requestPath) {
+        var pathComponents = requestPath.split('/');
+        if (pathComponents.length != 4) {
+            return false;
+        }
+        var first = checkForTs(pathComponents[1] || '');
+        var second = checkForAdvertiserId(pathComponents[2] || '');
+        var third = checkForTrackingMethod(pathComponents[3] || '');
+        return first && second && third;
+    }
+    function getTrackingUrlType(requestPath) {
+        var pathComponents = requestPath.split('/');
+        if (pathComponents.length !== 4) {
+            return TrackingUrlType.unknown;
+        }
+        var typeString = pathComponents[3] || '';
+        typeString = typeString.substring(0, 3);
+        switch (typeString) {
+            case 'tsc':
+                return TrackingUrlType.click;
+            case 'tsa':
+                return TrackingUrlType.conversion;
+            case 'tsv':
+                return TrackingUrlType.view;
+            default:
+                return TrackingUrlType.unknown;
         }
     }
-    return advertiser_id;
-}
-
-
-
-function extractEventData() {
-
-    let request_path = getRequestPath();
-    let query_params = getRequestQueryParameters();
-
-    let event_name = extractEventName(request_path);
-    let advertiser_id = extractAdvertiserId(request_path);
-    let timestamp = query_params.tst ? query_params.tst : '';
-    let site_id = query_params.sid ? query_params.sid : '';
-    let location_referrer = query_params.rrf ? query_params.rrf : '';
-    let location_href = query_params.hrf ? query_params.hrf : '';
-    let version = query_params.ver ? query_params.ver : '';
-    let param_ref = query_params.prf ? query_params.prf : '';
-    let user_value_1 = query_params.uv1 ? query_params.uv1 : '';
-    let user_value_2 = query_params.uv2 ? query_params.uv2 : '';
-    let customer_id = query_params.csi ? query_params.csi : '';
-    let session = query_params.session ? query_params.session : '';
-    let product_id = query_params.pid ? query_params.pid : '';
-    let rmd = query_params.rmd ? query_params.rmd : ''; //TODO
-    let screen_info = query_params.scr ? query_params.scr : '';
-    let cookies_enabled = query_params.nck ? query_params.nck : '';
-    let java_enabled = query_params.njv ? query_params.njv : '';
-    let gdpr_enabled = query_params.gdpr ? query_params.gdpr_enabled : '';
-    let gdpr_consent = query_params.gdpr_consent ? query_params.gdpr_consent : '';
-    let click_ids = getCookieValues('_iclid')[0] ? getCookieValues('_iclid')[0] : '';
-
-    let tracking_category = query_params.trc ? query_params.trc : '';
-    let conversion_target = query_params.ctg ? query_params.ctg : '';
-    let conversion_id = query_params.cid ? query_params.cid : '';
-    let order_value = query_params.orv ? query_params.orv : '';
-    let tracking_currency = query_params.orc ? query_params.orc : '';
-    let pay_method = query_params.pmt ? query_params.pmt : '';
-    let discount_value = query_params.dsv ? query_params.dsv : '';
-    let discount_code = query_params.dsc ? query_params.dsc : '';
-    let customer_new = query_params.csn ? query_params.csn : '';
-    let session_id = query_params.session ? query_params.session : '';
-    let basket = query_params.bsk ? query_params.bsk : '';
-
-
-    let dataLayer = {};
-    let missingFields = [];
-
-    if (event_name != '') { dataLayer.event_name = event_name; } else { missingFields.push('event_name'); }
-    if (advertiser_id != '') { dataLayer.advertiser_id = advertiser_id; } else { missingFields.push('advertiser_id'); }
-    if (timestamp != '') { dataLayer.timestamp = timestamp; } else { missingFields.push('timestamp'); }
-    if (site_id != '') { dataLayer.site_id = site_id; } else { missingFields.push('site_id'); }
-    if (location_referrer != '') { dataLayer.location_referrer = location_referrer; } else { missingFields.push('location_referrer'); }
-    if (location_href != '') { dataLayer.location_href = location_href; } else { missingFields.push('location_href'); }
-    if (version != '') { dataLayer.version = version; } else { missingFields.push('version'); }
-    if (param_ref != '') { dataLayer.param_ref = param_ref; } else { missingFields.push('param_ref'); }
-    if (user_value_1 != '') { dataLayer.user_value_1 = user_value_1; } else { missingFields.push('user_value_1'); }
-    if (user_value_2 != '') { dataLayer.user_value_2 = user_value_2; } else { missingFields.push('user_value_2'); }
-    if (customer_id != '') { dataLayer.customer_id = customer_id; } else { missingFields.push('customer_id'); }
-    if (session != '') { dataLayer.session = session; } else { missingFields.push('session'); }
-    if (product_id != '') { dataLayer.product_id = product_id; } else { missingFields.push('product_id'); }
-    if (rmd != '') { dataLayer.rmd = rmd; } else { missingFields.push('rmd'); }
-    if (screen_info != '') { dataLayer.screen_info = screen_info; } else { missingFields.push('screen_info'); }
-    if (cookies_enabled != '') { dataLayer.cookies_enabled = cookies_enabled; } else { missingFields.push('cookies_enabled'); }
-    if (java_enabled != '') { dataLayer.java_enabled = java_enabled; } else { missingFields.push('java_enabled'); }
-    if (gdpr_enabled != '') { dataLayer.gdpr_enabled = gdpr_enabled; } else { missingFields.push('gdpr_enabled'); }
-    if (gdpr_consent != '') { dataLayer.gdpr_consent = gdpr_consent; } else { missingFields.push('gdpr_consent'); }
-    if (click_ids != '') { dataLayer.click_ids = click_ids; } else { missingFields.push('click_ids'); }
-    if (tracking_category != '') { dataLayer.tracking_category = tracking_category; } else { missingFields.push('tracking_category'); }
-    if (conversion_target != '') { dataLayer.conversion_target = conversion_target; } else { missingFields.push('conversion_target'); }
-    if (conversion_id != '') { dataLayer.conversion_id = conversion_id; } else { missingFields.push('conversion_id'); }
-    if (order_value != '') { dataLayer.order_value = order_value; } else { missingFields.push('order_value'); }
-    if (tracking_currency != '') { dataLayer.tracking_currency = tracking_currency; } else { missingFields.push('tracking_currency'); }
-    if (pay_method != '') { dataLayer.pay_method = pay_method; } else { missingFields.push('pay_method'); }
-    if (discount_value != '') { dataLayer.discount_value = discount_value; } else { missingFields.push('discount_value'); }
-    if (discount_code != '') { dataLayer.discount_code = discount_code; } else { missingFields.push('discount_code'); }
-    if (customer_new != '') { dataLayer.customer_new = customer_new; } else { missingFields.push('customer_new'); }
-    if (session_id != '') { dataLayer.session_id = session_id; } else { missingFields.push('session_id'); }
-    if (basket != '') { dataLayer.basket = basket; } else { missingFields.push('basket'); }
-
-    let mfText = 'The following fields could not be read or were not present: ';
-    for (let i of missingFields) {
-        mfText += i + ' ';
+    function getAdvertiserId(requestPath) {
+        var pathComponents = requestPath.split('/');
+        if (pathComponents.length !== 4) {
+            return '';
+        }
+        return pathComponents[2] || '';
     }
-    logToConsole(mfText);
-    return dataLayer;
 
-}
+    var QueryParameter;
+    (function (QueryParameter) {
+        QueryParameter["REDIRECT_MODE"] = "rmd";
+        QueryParameter["PRODUCT_ID"] = "productId";
+        QueryParameter["CUSTOMER_ID"] = "csi";
+        QueryParameter["GDPR"] = "gdpr";
+        QueryParameter["GDPR_CONSENT"] = "gdpr_consent";
+        QueryParameter["HTTP_LOCATION"] = "hrf";
+        QueryParameter["HTTP_REFERRER"] = "rrf";
+        QueryParameter["SESSION_ID"] = "session";
+        QueryParameter["SITE_ID"] = "sid";
+        QueryParameter["TIMESTAMP"] = "tst";
+        QueryParameter["USER_AGENT"] = "user_agent";
+        QueryParameter["USER_VALUE_1"] = "uv1";
+        QueryParameter["USER_VALUE_2"] = "uv2";
+        QueryParameter["VERSION"] = "ver";
+        QueryParameter["CLICK_IDS"] = "iclid";
+        QueryParameter["CLICK_COOKIE"] = "tsc";
+        QueryParameter["VIEW_COOKIE"] = "tsv";
+        QueryParameter["UNIQUE_ID"] = "uniqid";
+        QueryParameter["TRACKING_CURRENCY"] = "orc";
+        QueryParameter["PAY_METHOD"] = "pmt";
+        QueryParameter["DISCOUNT_VALUE"] = "dsv";
+        QueryParameter["DISCOUNT_CODE"] = "dsc";
+        QueryParameter["CUSTOMER_NEW"] = "csn";
+        QueryParameter["CONVERSION_TARGET"] = "ctg";
+        QueryParameter["CONVERSION_ID"] = "cid";
+        QueryParameter["BASKET"] = "bsk";
+        QueryParameter["CONVERSION_RESPONSE_TYPE"] = "typ";
+        QueryParameter["TRACKING_CATEGORY"] = "trc";
+        QueryParameter["IP_ADDRESS"] = "ip_address";
+    })(QueryParameter || (QueryParameter = {}));
 
-if (checkUrl(getRequestPath())) {
-    claimRequest();
+    var EventType;
+    (function (EventType) {
+        EventType["I19S_VIEW"] = "i19s_view";
+        EventType["I19S_CLICK"] = "i19s_click";
+        EventType["I19S_CONVERSION"] = "i19s_conversion";
+        EventType["I19S_UNKNOWN"] = "i19s_unknown";
+    })(EventType || (EventType = {}));
+    function getEventTypeFromi19TrackingUrlType(trackingUrlType) {
+        switch (trackingUrlType) {
+            case TrackingUrlType.click:
+                return EventType.I19S_CLICK;
+            case TrackingUrlType.conversion:
+                return EventType.I19S_CONVERSION;
+            case TrackingUrlType.view:
+                return EventType.I19S_CONVERSION;
+            case TrackingUrlType.unknown:
+                return EventType.I19S_UNKNOWN;
+        }
+    }
 
-    let event = extractEventData();
+    var CookieName;
+    (function (CookieName) {
+        CookieName["CLICK_COOKIE"] = "tsc";
+        CookieName["VIEW_COOKIE"] = "tsv";
+        CookieName["ICLID_COOKIE"] = "_iclid";
+    })(CookieName || (CookieName = {}));
 
-    runContainer(event, () => returnResponse());
-}
+    function getConversionResponseType(conversionResponseTyp) {
+        switch (conversionResponseTyp) {
+            case 'i':
+                return "i";
+            case 'f':
+                return "f";
+            case 's':
+                return "s";
+            default:
+                return "unknown";
+        }
+    }
+
+    var BasketParam;
+    (function (BasketParam) {
+        BasketParam["POSITION_ORDER_NUMBER"] = "id";
+        BasketParam["POSITION_UUID"] = "uuid";
+        BasketParam["PRODUCT_ID"] = "pid";
+        BasketParam["NAME"] = "prn";
+        BasketParam["STOCK_KEEPING_UNIT"] = "sku";
+        BasketParam["PRODUCT_PRICE"] = "pri";
+        BasketParam["BRAND_NAME"] = "brn";
+        BasketParam["QUANTITY"] = "qty";
+        BasketParam["DISCOUNT_VALUE"] = "dsv";
+        BasketParam["SHIPPING_COSTS"] = "shp";
+        BasketParam["TAX"] = "tax";
+        BasketParam["TRACKING_CATEGORY"] = "trc";
+        BasketParam["PRODUCT_CATEGORY"] = "prc";
+    })(BasketParam || (BasketParam = {}));
+    function decodeBasketParam(logToConsole, decodeUriComponent, json, encodedString) {
+        logToConsole('call decodeBasketParam with: ' + logToConsole + ',' + decodeUriComponent + ',' + json + ',' + encodedString);
+        if (!encodedString || encodedString === '') {
+            logToConsole('Empty basketString: ' + encodedString);
+            return '';
+        }
+        var decodedString = decodeUriComponent(encodedString);
+        logToConsole('Basket-String to parse: ' + decodedString);
+        var basketArray = json.parse(decodedString);
+        return json.stringify(basketArray.map(function (entry) { return ({
+            position_order_number: entry.id,
+            position_uuid: entry.uuid,
+            product_id: entry.pid,
+            name: entry.prn,
+            stock_keeping_unit: entry.sku,
+            product_price: entry.pri,
+            brand_name: entry.brn,
+            quantity: entry.qty,
+            discount_value: entry.dsv,
+            shipping_costs: entry.shp,
+            tax: entry.tax,
+            tracking_category: entry.trc,
+            product_category: entry.prc
+        }); }));
+    }
+
+    function initEventVariables(json, logToConsole, decodeUriComponent, getRequestQueryParameter, getRequestHeader, getCookieValues, makeString, requestPath) {
+        var tracking_category = getRequestQueryParameter(QueryParameter.TRACKING_CATEGORY) || '';
+        logToConsole("tracking_category: ".concat(tracking_category));
+        var conversion_response_type = getConversionResponseType(getRequestQueryParameter(QueryParameter.CONVERSION_RESPONSE_TYPE)) || '';
+        logToConsole("conversion_response_type: ".concat(conversion_response_type));
+        var conversion_id = getRequestQueryParameter(QueryParameter.CONVERSION_ID) || '';
+        logToConsole("conversion_id: ".concat(conversion_id));
+        var conversion_target = getRequestQueryParameter(QueryParameter.CONVERSION_TARGET) || '';
+        logToConsole("conversion_target: ".concat(conversion_target));
+        var customer_new = getRequestQueryParameter(QueryParameter.CUSTOMER_NEW) || '';
+        logToConsole("customer_new: ".concat(customer_new));
+        var discount_code = getRequestQueryParameter(QueryParameter.DISCOUNT_CODE) || '';
+        logToConsole("discount_code: ".concat(discount_code));
+        var discount_value = getRequestQueryParameter(QueryParameter.DISCOUNT_VALUE) || '';
+        logToConsole("discount_value: ".concat(discount_value));
+        var pay_method = getRequestQueryParameter(QueryParameter.PAY_METHOD) || '';
+        logToConsole("pay_method: ".concat(pay_method));
+        var tracking_currency = getRequestQueryParameter(QueryParameter.TRACKING_CURRENCY) || '';
+        logToConsole("tracking_currency: ".concat(tracking_currency));
+        var unique_id = getRequestQueryParameter(QueryParameter.UNIQUE_ID) || '';
+        logToConsole("unique_id: ".concat(unique_id));
+        var event_name = getEventTypeFromi19TrackingUrlType(getTrackingUrlType(requestPath)) || '';
+        logToConsole("event_name: ".concat(event_name));
+        var advertiser_id = getAdvertiserId(requestPath) || '';
+        logToConsole("advertiser_id: ".concat(advertiser_id));
+        var customer_id = getRequestQueryParameter(QueryParameter.CUSTOMER_ID) || '';
+        logToConsole("customer_id: ".concat(customer_id));
+        var gdpr = getRequestQueryParameter(QueryParameter.GDPR) || '';
+        logToConsole("gdpr: ".concat(gdpr));
+        var gdpr_consent = getRequestQueryParameter(QueryParameter.GDPR_CONSENT) || '';
+        logToConsole("gdpr_consent: ".concat(gdpr_consent));
+        var http_location = getRequestQueryParameter(QueryParameter.HTTP_LOCATION) || '';
+        logToConsole("http_location: ".concat(http_location));
+        var http_referrer = getRequestQueryParameter(QueryParameter.HTTP_REFERRER) || '';
+        logToConsole("http_referrer: ".concat(http_referrer));
+        var i19s_click_cookie = getRequestQueryParameter(QueryParameter.CLICK_COOKIE) || '';
+        logToConsole("i19s_click_cookie: ".concat(i19s_click_cookie));
+        var i19s_click_ids = getRequestQueryParameter(QueryParameter.CLICK_IDS) || makeString(getCookieValues(CookieName.ICLID_COOKIE)) || '';
+        logToConsole("i19s_click_ids: ".concat(i19s_click_ids));
+        var i19s_view_cookie = getRequestQueryParameter(QueryParameter.VIEW_COOKIE) || '';
+        logToConsole("i19s_view_cookie: ".concat(i19s_view_cookie));
+        var product_id = getRequestQueryParameter(QueryParameter.PRODUCT_ID) || '';
+        logToConsole("product_id: ".concat(product_id));
+        var protocol = '';
+        var redirect_mode = getRequestQueryParameter(QueryParameter.REDIRECT_MODE) || '';
+        logToConsole("redirect_mode: ".concat(redirect_mode));
+        var session_id = getRequestQueryParameter(QueryParameter.SESSION_ID) || '';
+        logToConsole("session_id: ".concat(session_id));
+        var site_id = getRequestQueryParameter(QueryParameter.SITE_ID) || '';
+        logToConsole("site_id: ".concat(site_id));
+        var timestamp = getRequestQueryParameter(QueryParameter.TIMESTAMP) || '';
+        logToConsole("timestamp: ".concat(timestamp));
+        var tracking_domain = getRequestHeader('host') || '';
+        logToConsole("tracking_domain: ".concat(tracking_domain));
+        var tracking_url_type = getTrackingUrlType(requestPath);
+        var user_agent = getRequestHeader('user-agent') || getRequestQueryParameter(QueryParameter.USER_AGENT) || '';
+        logToConsole("user_agent: ".concat(user_agent));
+        var user_value_1 = getRequestQueryParameter(QueryParameter.USER_VALUE_1) || '';
+        logToConsole("user_value_1: ".concat(user_value_1));
+        var user_value_2 = getRequestQueryParameter(QueryParameter.USER_VALUE_2) || '';
+        logToConsole("user_value_2: ".concat(user_value_2));
+        var version = getRequestQueryParameter(QueryParameter.VERSION) || '';
+        logToConsole("version: ".concat(version));
+        var basket = decodeBasketParam(logToConsole, decodeUriComponent, json, getRequestQueryParameter(QueryParameter.BASKET)) || '';
+        logToConsole("basket: ".concat(basket));
+        var ip_address = getRequestQueryParameter(QueryParameter.IP_ADDRESS) || '';
+        return {
+            ip_address: ip_address,
+            tracking_category: tracking_category,
+            conversion_response_type: conversion_response_type,
+            basket: basket,
+            conversion_id: conversion_id,
+            conversion_target: conversion_target,
+            customer_new: customer_new,
+            discount_code: discount_code,
+            discount_value: discount_value,
+            pay_method: pay_method,
+            tracking_currency: tracking_currency,
+            unique_id: unique_id,
+            event_name: event_name,
+            advertiser_id: advertiser_id,
+            customer_id: customer_id,
+            gdpr: gdpr,
+            gdpr_consent: gdpr_consent,
+            http_location: http_location,
+            http_referrer: http_referrer,
+            i19s_click_cookie: i19s_click_cookie,
+            i19s_click_ids: i19s_click_ids,
+            i19s_view_cookie: i19s_view_cookie,
+            product_id: product_id,
+            protocol: protocol,
+            redirect_mode: redirect_mode,
+            session_id: session_id,
+            site_id: site_id,
+            timestamp: timestamp,
+            tracking_domain: tracking_domain,
+            tracking_url_type: tracking_url_type,
+            user_agent: user_agent,
+            user_value_1: user_value_1,
+            user_value_2: user_value_2,
+            version: version
+        };
+    }
+
+    var makeString = require('makeString');
+
+    var claimRequest = require('claimRequest');
+
+    var getRequestQueryParameter = require('getRequestQueryParameter');
+
+    var runContainer = require('runContainer');
+
+    var getRequestPath = require('getRequestPath');
+
+    var getRequestHeader = require('getRequestHeader');
+
+    var returnResponse = require('returnResponse');
+
+    var getCookieValues = require('getCookieValues');
+
+    var decodeUriComponent = require('decodeUriComponent');
+
+    var logToConsole = require('logToConsole');
+
+    var json = require('JSON');
+
+    var requestPath = getRequestPath();
+    if (checkFori19sTrackingPath(requestPath)) {
+        claimRequest();
+        runContainer(initEventVariables(json, logToConsole, decodeUriComponent, getRequestQueryParameter, getRequestHeader, getCookieValues, makeString, requestPath), function () { return returnResponse(); }, function () { });
+    }
+
+})();
 
 
 ___SERVER_PERMISSIONS___
@@ -291,9 +451,6 @@ ___SERVER_PERMISSIONS___
           }
         }
       ]
-    },
-    "clientAnnotations": {
-      "isEditedByUser": true
     },
     "isRequired": true
   }
